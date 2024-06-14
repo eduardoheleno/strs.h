@@ -1,7 +1,43 @@
 #include "file.h"
 #include "strs.h"
 
-// MN magic number
+static STree *root;
+
+// still not working
+int read_word(char **word_buffer, char *line_buffer, int line_size) {
+    static int cursor = 0;
+    size_t word_buffer_size = 0;
+
+    if (cursor >= line_size) {
+	// not entering in this condition
+	exit(1);
+	cursor = 0;
+	return -1;
+    }
+
+    while (line_buffer[cursor] != ' ' && cursor < line_size) {
+	cursor++;
+	word_buffer_size++;
+    }
+
+    *word_buffer = malloc((sizeof(char) * word_buffer_size) + 1);
+    for (int i = 0; i < word_buffer_size; i++) {
+	(*word_buffer)[i] = line_buffer[cursor];
+	(*word_buffer)[word_buffer_size] = '\0';
+    }
+
+    return 1;
+}
+
+WINDOW* init_ncurses() {
+    WINDOW *w = initscr();
+    noecho();
+
+    start_color();
+    init_pair(1, COLOR_BLACK, COLOR_RED);
+
+    return w;
+}
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -9,61 +45,49 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    char *file_name = argv[1];
-    FILE *fptr = open_file(file_name);
+    WINDOW *w = init_ncurses();
+    int line_size = getmaxx(w), y_counter = 0;
 
-    WINDOW *w = initscr();
-    noecho();
+    char *file_name = argv[1], line_buffer[line_size];
+    FILE *f = open_file(file_name);
 
-    start_color();
-    init_pair(1, COLOR_BLACK, COLOR_RED);
+    root = malloc(sizeof(STree));
+    size_t total_size = -1;
 
-    int line_size = getmaxx(w);
-    char line_buffer[line_size];
+    while (read_line(f, line_size, line_buffer) > 0) {
+	char *word_buffer = NULL;
+	while (read_word(&word_buffer, line_buffer, line_size) > 0) {
+	    // include_chunk(root, word_buffer, &total_size);
+	    printw("%s", word_buffer);
+	    refresh();
+	    free(word_buffer);
+	}
 
-    print_file(fptr, w);
+	// mvprintw(y_counter++, 0, "%s", line_buffer);
+    }
+
+    fclose(f);
+
+    refresh();
 
     getch();
 
     endwin();
 
- //    STree *root = malloc(sizeof(STree));
- //    char *chunk = "teste";
- //    int chunk_size = strlen(chunk);
-	//
- //    int str_size = 0;
- //    str_size += chunk_size;
-	//
- //    int i = chunk_size - 1;
-	//
- //    int char_position = str_size;
- //    while (i >= 0) {
-	// STree *curr_root = root;
-	//
-	// for (int j = i; j < chunk_size; j++) {
-	//     int asc_char = chunk[j] - ASCII_DECIMAL_MN;
-	//
-	//     if (curr_root->childrens[asc_char] == NULL) {
-	// 	STree *node = malloc(sizeof(STree));
-	// 	node->positions_size = 1;
-	// 	node->positions = malloc(sizeof(int) * node->positions_size);
-	// 	node->positions[0] = char_position;
-	//
-	// 	curr_root->childrens[asc_char] = node;
-	// 	curr_root = node;
-	//     } else {
-	// 	curr_root = curr_root->childrens[asc_char];
-	//
-	// 	curr_root->positions_size++;
-	// 	curr_root->positions = realloc(curr_root->positions, sizeof(int) * curr_root->positions_size);
-	// 	curr_root->positions[curr_root->positions_size - 1] = char_position;
-	//     }
-	// }
-	//
-	// char_position--;
-	// i--;
- //    }
+    // teste minimize
+
+
+
+    // char *chunk = "teste\0";
+    // char *chunk2 = "minimize\0";
+    //
+    // include_chunk(root, chunk, &total_size);
+    // include_chunk(root, chunk2, &total_size);
+
+    // printf("%zu", total_size);
+    // include_chunk(root, )
 
     // printf("%i\n", root->childrens[(int)'s' - 97]->childrens[(int)'t' - 97]->positions[0]);
+    // printf("%i\n", root->childrens[(int)'m' - 97]->positions[1]);
     return 0;
 }

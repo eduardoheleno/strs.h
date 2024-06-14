@@ -6,6 +6,6 @@
 #include <ncurses.h>
 
 FILE* open_file(char *file_name);
-void print_file(FILE *fptr, WINDOW *w);
+int read_line(FILE *f, int line_size, char *line_buffer);
 
 #endif

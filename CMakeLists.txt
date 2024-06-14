@@ -7,6 +7,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(SOURCES
     src/main.c
     src/file.c
+    src/strs.c
 )
 
 find_package(Curses REQUIRED)
