@@ -9,7 +9,8 @@ size_t strs_strlen(char *str) {
     return len;
 }
 
-void include_chunk(STree *root, char *chunk, size_t *total_size) {
+// the tree is not versatile (doesnt accept special characters, only letters)
+void strs_include_chunk(STree *root, char *chunk, size_t *total_size) {
     size_t chunk_size = strs_strlen(chunk);
     *total_size += chunk_size + 1;
 
