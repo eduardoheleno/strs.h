@@ -11,6 +11,7 @@ WINDOW* init_ncurses() {
     return w;
 }
 
+// redo
 int read_word(char **word_buffer, char *line_buffer, int line_size) {
     size_t word_buffer_size = 0;
     static size_t cursor = 0;
@@ -20,20 +21,18 @@ int read_word(char **word_buffer, char *line_buffer, int line_size) {
 	return -1;
     }
 
-    // replace while with for by line_size
     while (line_buffer[cursor] != ' ' && cursor < line_size) {
-	++cursor;
-	++word_buffer_size;
+	cursor++;
+	word_buffer_size++;
     }
 
     *word_buffer = malloc((sizeof(char) * word_buffer_size) + 1);
     int counter = 0;
     for (int i = cursor - word_buffer_size; i < cursor; ++i) {
-	(*word_buffer)[counter] = line_buffer[i];
-	counter++;
+	(*word_buffer)[counter++] = line_buffer[i];
     }
 
-    (*word_buffer)[cursor] = '\0';
+    (*word_buffer)[counter] = '\0';
     cursor++;
 
     return 1;

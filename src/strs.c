@@ -12,6 +12,8 @@ size_t strs_strlen(char *str) {
 // the tree is not versatile (doesnt accept special characters, only letters)
 void strs_include_chunk(STree *root, char *chunk, size_t *total_size) {
     size_t chunk_size = strs_strlen(chunk);
+
+    // redo total_size and chunk_size calculations
     *total_size += chunk_size + 1;
 
     int i = chunk_size - 1, char_position = *total_size - 1;
