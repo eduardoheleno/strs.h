@@ -1,6 +1,8 @@
 #include "file.h"
 #include "strs.h"
 
+#define SPACE_CHAR ' '
+
 WINDOW* init_ncurses() {
     WINDOW *w = initscr();
     noecho();
@@ -11,29 +13,30 @@ WINDOW* init_ncurses() {
     return w;
 }
 
-// redo
 int read_word(char **word_buffer, char *line_buffer, int line_size) {
     size_t word_buffer_size = 0;
     static size_t cursor = 0;
 
-    if (cursor >= line_size || line_buffer[cursor] == ' ' || line_buffer[cursor] == '\0') {
+    for (; cursor < line_size - 1; cursor++) {
+	if (line_buffer[cursor] == SPACE_CHAR && word_buffer_size > 0) {
+	    break;
+	}
+
+	if (line_buffer[cursor] != SPACE_CHAR) {
+	    word_buffer_size++;
+	}
+    }
+    if (cursor >= line_size - 1 && word_buffer_size == 0) {
 	cursor = 0;
 	return -1;
     }
 
-    while (line_buffer[cursor] != ' ' && cursor < line_size) {
-	cursor++;
-	word_buffer_size++;
+    *word_buffer = malloc(sizeof(char) * (word_buffer_size + 1));
+    size_t buf_ch_pos = 0;
+    for (int i = cursor - word_buffer_size; i < cursor; i++) {
+	(*word_buffer)[buf_ch_pos++] = line_buffer[i];
     }
-
-    *word_buffer = malloc((sizeof(char) * word_buffer_size) + 1);
-    int counter = 0;
-    for (int i = cursor - word_buffer_size; i < cursor; ++i) {
-	(*word_buffer)[counter++] = line_buffer[i];
-    }
-
-    (*word_buffer)[counter] = '\0';
-    cursor++;
+    (*word_buffer)[buf_ch_pos] = '\0';
 
     return 1;
 }
@@ -56,7 +59,6 @@ int main(int argc, char *argv[]) {
     while (read_line(f, line_size, line_buffer) > 0) {
 	char *word_buffer = NULL;
 	while (read_word(&word_buffer, line_buffer, line_size) > 0) {
-	    // segmentation fault
 	    strs_include_chunk(root, word_buffer, &total_size);
 	    free(word_buffer);
 	}
