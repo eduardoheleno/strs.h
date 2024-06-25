@@ -13,6 +13,6 @@ typedef struct STree {
     int positions_size;
 } STree;
 
-void strs_include_chunk(STree *root, char *chunk, size_t *total_size);
+void strs_include_chunk(STree *root, char *chunk, size_t total_size);
 
 #endif
