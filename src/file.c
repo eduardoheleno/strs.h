@@ -1,4 +1,5 @@
 #include "file.h"
+#include <stdlib.h>
 
 FILE* open_file(char *file_name) {
     FILE *f = fopen(file_name, "r");

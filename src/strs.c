@@ -1,4 +1,5 @@
 #include "strs.h"
+#include <string.h>
 
 size_t strs_strlen(char *str) {
     size_t len = 0;
@@ -26,10 +27,7 @@ void strs_include_chunk(STree *root, char *chunk, size_t total_size) {
 		node->positions = malloc(sizeof(int) * node->positions_size);
 		node->positions[0] = char_position;
 
-		// check another way to initialize the childrens
-		for (int k = 0; k < 26; k++) {
-		    node->childrens[k] = NULL;
-		}
+		memset(node->childrens, 0, sizeof(node->childrens));
 
 		curr_root->childrens[asc_char] = node;
 		curr_root = node;
@@ -45,4 +43,26 @@ void strs_include_chunk(STree *root, char *chunk, size_t total_size) {
 	char_position--;
 	i--;
     }
+}
+
+int* strs_search_positions(STree *root, char *c_arr, size_t c_size) {
+    STree *curr_root = root;
+    int *positions = NULL;
+
+    for (int i = 0; i < c_size; i++) {
+	if (curr_root->childrens[c_arr[i] - ASCII_DECIMAL_MN] == NULL) {
+	    curr_root = NULL;
+	    break;
+	}
+	curr_root = curr_root->childrens[c_arr[i] - ASCII_DECIMAL_MN];
+    }
+
+    if (curr_root != NULL) {
+	positions = malloc(sizeof(int) * curr_root->positions_size);
+	for (int i = 0; i < curr_root->positions_size; i++) {
+	    positions[i] = curr_root->positions[i];
+	}
+    }
+
+    return positions;
 }

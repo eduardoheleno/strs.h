@@ -14,5 +14,6 @@ typedef struct STree {
 } STree;
 
 void strs_include_chunk(STree *root, char *chunk, size_t total_size);
+int* strs_search_positions(STree *root, char *c_arr, size_t c_size);
 
 #endif

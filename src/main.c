@@ -2,6 +2,7 @@
 #include "strs.h"
 
 #define SPACE_CHAR ' '
+#define ESC_KEY 27
 
 WINDOW* init_ncurses() {
     WINDOW *w = initscr();
@@ -68,10 +69,23 @@ int main(int argc, char *argv[]) {
 
 	mvprintw(y_counter++, 0, "%s", line_buffer);
     }
-
-    fclose(f);
     refresh();
-    getch();
+    fclose(f);
+
+    size_t c_size = 0;
+    char *c_arr;
+    int *positions = NULL;
+
+    for (;;) {
+	char c = getch();
+	if (c == ESC_KEY) break;
+	if ((c - ASCII_DECIMAL_MN) < 0 || (c - ASCII_DECIMAL_MN) > 25) continue;
+
+	c_arr = realloc(c_arr, ++c_size);
+	c_arr[c_size - 1] = c;
+
+	positions = strs_search_positions(root, c_arr, c_size);
+    }
 
     endwin();
 
