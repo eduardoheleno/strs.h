@@ -1,8 +1,11 @@
 #include "file.h"
 #include "strs.h"
+#include <string.h>
+#include <curses.h>
 
 #define SPACE_CHAR ' '
 #define ESC_KEY 27
+#define ENTER_KEY 10
 
 WINDOW* init_ncurses() {
     WINDOW *w = initscr();
@@ -14,19 +17,15 @@ WINDOW* init_ncurses() {
     return w;
 }
 
-// wrong line_size "if line has '\n' char"
+// wrong line_size (if line has '\n' char)
+// '\n' char delimits the end of a word, but only ' ' should settle that
 int read_word(char **word_buffer, char *line_buffer, int line_size, size_t *total_size) {
     size_t word_buffer_size = 0;
     static size_t cursor = 0;
 
     for (; cursor < line_size - 1; cursor++) {
-	if (line_buffer[cursor] == SPACE_CHAR && word_buffer_size > 0) {
-	    break;
-	}
-
-	if (line_buffer[cursor] != SPACE_CHAR) {
-	    word_buffer_size++;
-	}
+	if (line_buffer[cursor] == SPACE_CHAR && word_buffer_size > 0) break;
+	if (line_buffer[cursor] != SPACE_CHAR) word_buffer_size++;
 
 	++*total_size;
     }
@@ -43,6 +42,34 @@ int read_word(char **word_buffer, char *line_buffer, int line_size, size_t *tota
     (*word_buffer)[buf_ch_pos] = '\0';
 
     return 1;
+}
+
+void highlight_characters(int *positions, char *c_arr, int line_size, size_t positions_size) {
+    if (positions == NULL) return;
+
+    attron(COLOR_PAIR(1));
+    for (int i = 0; i < positions_size; i++) {
+	int position = positions[i];
+	int line = position / line_size;
+	int row = (position % line_size) + line;
+
+	mvprintw(line, row, "%s", c_arr);
+	refresh();
+    }
+    attroff(COLOR_PAIR(1));
+}
+
+void clear_highlight(int *positions, char *c_arr, int line_size, size_t positions_size) {
+    if (positions == NULL) return;
+
+    for (int i = 0; i < positions_size; i++) {
+	int position = positions[i];
+	int line = position / line_size;
+	int row = (position % line_size) + line;
+
+	mvprintw(line, row, "%s", c_arr);
+	refresh();
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -75,18 +102,25 @@ int main(int argc, char *argv[]) {
     size_t c_size = 0;
     char *c_arr;
     int *positions = NULL;
+    size_t positions_size = 0;
 
     for (;;) {
 	char c = getch();
-	if (c == ESC_KEY) break;
-	if ((c - ASCII_DECIMAL_MN) < 0 || (c - ASCII_DECIMAL_MN) > 25) continue;
+	if ((int) c == ESC_KEY) break;
+	if (((int) c - ASCII_DECIMAL_MN) < 0 || ((int) c - ASCII_DECIMAL_MN) > 25) continue;
 
-	c_arr = realloc(c_arr, ++c_size);
+	clear_highlight(positions, c_arr, line_size, positions_size);
+
+	c_arr = realloc(c_arr, (sizeof(char) * ++c_size) + sizeof(char));
 	c_arr[c_size - 1] = c;
+	c_arr[c_size] = '\0';
 
-	positions = strs_search_positions(root, c_arr, c_size);
+	positions = strs_search_positions(root, c_arr, c_size, &positions_size);
+	highlight_characters(positions, c_arr, line_size, positions_size);
     }
 
+    free(positions);
+    free(c_arr);
     endwin();
 
     return 0;

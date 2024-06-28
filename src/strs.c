@@ -45,7 +45,7 @@ void strs_include_chunk(STree *root, char *chunk, size_t total_size) {
     }
 }
 
-int* strs_search_positions(STree *root, char *c_arr, size_t c_size) {
+int* strs_search_positions(STree *root, char *c_arr, size_t c_size, size_t *positions_size) {
     STree *curr_root = root;
     int *positions = NULL;
 
@@ -58,10 +58,9 @@ int* strs_search_positions(STree *root, char *c_arr, size_t c_size) {
     }
 
     if (curr_root != NULL) {
+	*positions_size = curr_root->positions_size;
 	positions = malloc(sizeof(int) * curr_root->positions_size);
-	for (int i = 0; i < curr_root->positions_size; i++) {
-	    positions[i] = curr_root->positions[i];
-	}
+	positions = curr_root->positions;
     }
 
     return positions;
