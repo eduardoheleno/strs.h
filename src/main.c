@@ -20,7 +20,9 @@ WINDOW* init_ncurses() {
     return w;
 }
 
-// '\n' char delimits the end of a word, but only ' ' should settle that
+// TODO (maybe): '\n' char delimits the end of a word, but only ' ' should settle that
+// TODO: accept all default ASCII characters
+
 int read_word(char **word_buffer, char *line_buffer, int line_size, int *x) {
     size_t word_buffer_size = 0;
     static size_t cursor = 0;
