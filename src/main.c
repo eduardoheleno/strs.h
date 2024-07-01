@@ -6,6 +6,7 @@
 #define SPACE_CHAR ' '
 #define EOL '\n'
 #define ESC_KEY 27
+#define BACKSPACE_KEY 127
 #define ENTER_KEY 10
 
 static STree root;
@@ -20,9 +21,6 @@ WINDOW* init_ncurses() {
     return w;
 }
 
-// TODO (maybe): '\n' char delimits the end of a word, but only ' ' should settle that
-// TODO: accept all default ASCII characters
-
 int read_word(char **word_buffer, char *line_buffer, int line_size, int *x) {
     size_t word_buffer_size = 0;
     static size_t cursor = 0;
@@ -30,7 +28,7 @@ int read_word(char **word_buffer, char *line_buffer, int line_size, int *x) {
     for (; cursor < line_size - 1; cursor++) {
 	if (line_buffer[cursor] == EOL && word_buffer_size > 0) break;
 	if (line_buffer[cursor] == SPACE_CHAR && word_buffer_size > 0) break;
-	if (line_buffer[cursor] != SPACE_CHAR) word_buffer_size++;
+	if (line_buffer[cursor] != SPACE_CHAR && line_buffer[cursor] != EOL) word_buffer_size++;
 
 	if (line_buffer[cursor] == EOL) {
 	    cursor = 0;
@@ -78,6 +76,20 @@ void clear_highlight(Position **positions, char *c_arr, int line_size, size_t po
     }
 }
 
+void clear_last_char(size_t *c_size, char *c_arr, int row_size) {
+    if (c_arr == NULL) return;
+
+    if (*c_size == 0) {
+	free(c_arr);
+	c_arr = NULL;
+
+	return;
+    }
+    c_arr[--*c_size] = '\0';
+    c_arr = realloc(c_arr, (sizeof(char) * *c_size) + sizeof(char));
+    mvdelch(row_size - 1, *c_size + 18);
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 2) {
 	perror("not enough arguments");
@@ -113,8 +125,17 @@ int main(int argc, char *argv[]) {
 
     for (;;) {
 	char c = getch();
+	if ((int) c == BACKSPACE_KEY) {
+	    clear_highlight(positions, c_arr, line_size, positions_size);
+
+	    clear_last_char(&c_size, c_arr, row_size);
+
+	    positions = strs_search_positions(&root, c_arr, c_size, &positions_size);
+	    highlight_characters(positions, c_arr, line_size, positions_size);
+	    continue;
+	}
 	if ((int) c == ESC_KEY) break;
-	if (((int) c - ASCII_DECIMAL_MN) < 0 || ((int) c - ASCII_DECIMAL_MN) > 25) continue;
+	if (((int) c - ASCII_DECIMAL_MN) < 0 || ((int) c - ASCII_DECIMAL_MN) > 92) continue;
 
 	clear_highlight(positions, c_arr, line_size, positions_size);
 
