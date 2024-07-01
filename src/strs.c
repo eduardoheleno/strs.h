@@ -11,21 +11,25 @@ size_t strs_strlen(char *str) {
 }
 
 // the tree is not versatile (doesnt accept special characters, only letters)
-void strs_include_chunk(STree *root, char *chunk, size_t total_size) {
+void strs_include_chunk(STree *root, char *chunk, int x, int y) {
     size_t chunk_size = strs_strlen(chunk);
-    int i = chunk_size - 1, char_position = total_size - 1;
+    int i = chunk_size - 1, x_position = x - 1, y_position = y;
 
     while (i >= 0) {
 	STree *curr_root = root;
+	Position *p = malloc(sizeof(Position));
+	p->x = x_position;
+	p->y = y_position;
+
 	for (int j = i; j < chunk_size; j++) {
-	    char test = chunk[j];
 	    int asc_char = chunk[j] - ASCII_DECIMAL_MN;
+	    char teste = chunk[j];
 
 	    if (curr_root->childrens[asc_char] == NULL) {
 		STree *node = malloc(sizeof(STree));
 		node->positions_size = 1;
-		node->positions = malloc(sizeof(int) * node->positions_size);
-		node->positions[0] = char_position;
+		node->positions = malloc(sizeof(Position) * node->positions_size);
+		node->positions[0] = p;
 
 		memset(node->childrens, 0, sizeof(node->childrens));
 
@@ -35,19 +39,18 @@ void strs_include_chunk(STree *root, char *chunk, size_t total_size) {
 		curr_root = curr_root->childrens[asc_char];
 
 		curr_root->positions_size++;
-		curr_root->positions = realloc(curr_root->positions, sizeof(int) * curr_root->positions_size);
-		curr_root->positions[curr_root->positions_size - 1] = char_position;
+		curr_root->positions = realloc(curr_root->positions, sizeof(Position) * curr_root->positions_size);
+		curr_root->positions[curr_root->positions_size - 1] = p;
 	    }
 	}
-
-	char_position--;
+	x_position--;
 	i--;
     }
 }
 
-int* strs_search_positions(STree *root, char *c_arr, size_t c_size, size_t *positions_size) {
+Position** strs_search_positions(STree *root, char *c_arr, size_t c_size, size_t *positions_size) {
     STree *curr_root = root;
-    int *positions = NULL;
+    Position **positions = NULL;
 
     for (int i = 0; i < c_size; i++) {
 	if (curr_root->childrens[c_arr[i] - ASCII_DECIMAL_MN] == NULL) {
