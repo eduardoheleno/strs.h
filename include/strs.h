@@ -4,14 +4,14 @@
 #include <stdlib.h>
 
 // MN magic number
-#define ASCII_DECIMAL_MN 33
+#define ASCII_DECIMAL_MN 32
 
 typedef struct Position {
     int x, y;
 } Position;
 
 typedef struct STree {
-    struct STree *childrens[93];
+    struct STree *childrens[94];
 
     Position **positions;
     int positions_size;

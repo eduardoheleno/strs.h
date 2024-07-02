@@ -10,7 +10,6 @@ size_t strs_strlen(char *str) {
     return len;
 }
 
-// the tree is not versatile (doesnt accept special characters, only letters)
 void strs_include_chunk(STree *root, char *chunk, int x, int y) {
     size_t chunk_size = strs_strlen(chunk);
     int i = chunk_size - 1, x_position = x - 1, y_position = y;

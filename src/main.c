@@ -8,12 +8,14 @@
 #define ESC_KEY 27
 #define BACKSPACE_KEY 127
 #define ENTER_KEY 10
+#define DOWN_KEY 279166
 
 static STree root;
 
 WINDOW* init_ncurses() {
     WINDOW *w = initscr();
     noecho();
+    keypad(w, TRUE);
 
     start_color();
     init_pair(1, COLOR_BLACK, COLOR_RED);
@@ -21,11 +23,11 @@ WINDOW* init_ncurses() {
     return w;
 }
 
-int read_word(char **word_buffer, char *line_buffer, int line_size, int *x) {
+int read_word(char **word_buffer, char *line_buffer, int terminal_max_x, int *x) {
     size_t word_buffer_size = 0;
     static size_t cursor = 0;
 
-    for (; cursor < line_size - 1; cursor++) {
+    for (; cursor < terminal_max_x - 1; cursor++) {
 	if (line_buffer[cursor] == EOL && word_buffer_size > 0) break;
 	if (line_buffer[cursor] == SPACE_CHAR && word_buffer_size > 0) break;
 	if (line_buffer[cursor] != SPACE_CHAR && line_buffer[cursor] != EOL) word_buffer_size++;
@@ -37,7 +39,7 @@ int read_word(char **word_buffer, char *line_buffer, int line_size, int *x) {
 
 	++*x;
     }
-    if (cursor >= line_size - 1 && word_buffer_size == 0) {
+    if (cursor >= terminal_max_x - 1 && word_buffer_size == 0) {
 	cursor = 0;
 	return -1;
     }
@@ -52,7 +54,7 @@ int read_word(char **word_buffer, char *line_buffer, int line_size, int *x) {
     return 1;
 }
 
-void highlight_characters(Position **positions, char *c_arr, int line_size, size_t positions_size) {
+void highlight_characters(Position **positions, char *c_arr, int terminal_max_x, size_t positions_size) {
     if (positions == NULL) return;
 
     attron(COLOR_PAIR(1));
@@ -65,7 +67,7 @@ void highlight_characters(Position **positions, char *c_arr, int line_size, size
     attroff(COLOR_PAIR(1));
 }
 
-void clear_highlight(Position **positions, char *c_arr, int line_size, size_t positions_size) {
+void clear_highlight(Position **positions, char *c_arr, int terminal_max_x, size_t positions_size) {
     if (positions == NULL) return;
 
     for (int i = 0; i < positions_size; i++) {
@@ -76,7 +78,7 @@ void clear_highlight(Position **positions, char *c_arr, int line_size, size_t po
     }
 }
 
-void clear_last_char(size_t *c_size, char *c_arr, int row_size) {
+void clear_last_char(size_t *c_size, char *c_arr, int terminal_max_y) {
     if (c_arr == NULL) return;
 
     if (*c_size == 0) {
@@ -87,7 +89,49 @@ void clear_last_char(size_t *c_size, char *c_arr, int row_size) {
     }
     c_arr[--*c_size] = '\0';
     c_arr = realloc(c_arr, (sizeof(char) * *c_size) + sizeof(char));
-    mvdelch(row_size - 1, *c_size + 18);
+    mvdelch(terminal_max_y - 1, *c_size + 18);
+}
+
+char** load_file(FILE *f, int terminal_max_x) {
+    if (f == NULL) perror("couldn't load the file");
+
+    char **file_lines = NULL;
+    char line_buffer[terminal_max_x];
+    size_t line_counter = 0;
+
+    while (read_line(f, terminal_max_x, line_buffer) > 0) {
+	size_t buffer_size = 0;
+	while (line_buffer[buffer_size] != '\n') {
+	    buffer_size++;
+	}
+
+	file_lines = realloc(file_lines, sizeof(char*) * ++line_counter);
+	file_lines[line_counter - 1] = malloc(sizeof(char) * buffer_size + 1);
+
+	strcpy(file_lines[line_counter - 1], line_buffer);
+	file_lines[line_counter - 1][buffer_size] = '\0';
+    }
+
+    return file_lines;
+}
+
+void terminal_render_file(char **file_lines, int y_offset) {
+    clear();
+    for (int i = 0; file_lines[y_offset] != NULL; i++) {
+	mvprintw(i, 0, "%s", file_lines[y_offset]);
+	y_offset++;
+    }
+    refresh();
+}
+
+void build_stree(char **file_lines, int terminal_max_x) {
+    int x = 0, y = 0;
+
+    for (int i = 0; file_lines[i] != NULL; i++) {
+	x = strlen(file_lines[i]);
+	strs_include_chunk(&root, file_lines[i], x, y);
+	y++;
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -97,59 +141,63 @@ int main(int argc, char *argv[]) {
     }
 
     WINDOW *w = init_ncurses();
-    int line_size = getmaxx(w), row_size = getmaxy(w);
+    int terminal_max_x = getmaxx(w), terminal_max_y = getmaxy(w);
 
-    char *file_name = argv[1], line_buffer[line_size];
+    char *file_name = argv[1], line_buffer[terminal_max_x];
     FILE *f = open_file(file_name);
 
-    int x = 0, y = 0;
+    char **file_lines = load_file(f, terminal_max_x);
+    terminal_render_file(file_lines, 0);
+    build_stree(file_lines, terminal_max_x);
 
-    while (read_line(f, line_size, line_buffer) > 0) {
-	char *word_buffer = NULL;
-	x = 0;
-
-	while (read_word(&word_buffer, line_buffer, line_size, &x) > 0) {
-	    strs_include_chunk(&root, word_buffer, x, y);
-	    free(word_buffer);
-	}
-
-	mvprintw(y++, 0, "%s", line_buffer);
-    }
     refresh();
     fclose(f);
 
-    size_t c_size = 0;
-    char *c_arr;
     Position **positions = NULL;
-    size_t positions_size = 0;
+    size_t c_size = 0, positions_size = 0;
+    char *c_arr;
+    int y_offset = 0;
 
     for (;;) {
-	char c = getch();
-	if ((int) c == BACKSPACE_KEY) {
-	    clear_highlight(positions, c_arr, line_size, positions_size);
+	int c = getch();
 
-	    clear_last_char(&c_size, c_arr, row_size);
+	if (c == KEY_DOWN) {
+	    if (file_lines[y_offset + 1] != NULL) {
+		terminal_render_file(file_lines, ++y_offset);
+	    }
+	}
+	if (c == KEY_UP) {
+	    if (y_offset - 1 >= 0) {
+		terminal_render_file(file_lines, --y_offset);
+	    }
+	}
+
+	if (c == KEY_BACKSPACE) {
+	    clear_highlight(positions, c_arr, terminal_max_x, positions_size);
+
+	    clear_last_char(&c_size, c_arr, terminal_max_y);
 
 	    positions = strs_search_positions(&root, c_arr, c_size, &positions_size);
-	    highlight_characters(positions, c_arr, line_size, positions_size);
+	    highlight_characters(positions, c_arr, terminal_max_x, positions_size);
 	    continue;
 	}
-	if ((int) c == ESC_KEY) break;
-	if (((int) c - ASCII_DECIMAL_MN) < 0 || ((int) c - ASCII_DECIMAL_MN) > 92) continue;
+	if (c == ESC_KEY) break;
+	if ((c - ASCII_DECIMAL_MN) < 0 || (c - ASCII_DECIMAL_MN) > 93) continue;
 
-	clear_highlight(positions, c_arr, line_size, positions_size);
+	clear_highlight(positions, c_arr, terminal_max_x, positions_size);
 
 	c_arr = realloc(c_arr, (sizeof(char) * ++c_size) + sizeof(char));
 	c_arr[c_size - 1] = c;
 	c_arr[c_size] = '\0';
 
 	positions = strs_search_positions(&root, c_arr, c_size, &positions_size);
-	highlight_characters(positions, c_arr, line_size, positions_size);
+	highlight_characters(positions, c_arr, terminal_max_x, positions_size);
 
-	mvprintw(row_size - 1, 0, "searched pattern: %s", c_arr);
+	mvprintw(terminal_max_y - 1, 0, "searched pattern: %s", c_arr);
 	refresh();
     }
 
+    // free properly
     free(positions);
     free(c_arr);
     endwin();
