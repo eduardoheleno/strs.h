@@ -8,7 +8,6 @@
 #define ESC_KEY 27
 #define BACKSPACE_KEY 127
 #define ENTER_KEY 10
-#define DOWN_KEY 279166
 
 static STree root;
 
@@ -92,42 +91,41 @@ void clear_last_char(size_t *c_size, char *c_arr, int terminal_max_y) {
     mvdelch(terminal_max_y - 1, *c_size + 18);
 }
 
-char** load_file(FILE *f, int terminal_max_x) {
+char** load_file(FILE *f, int terminal_max_x, size_t *file_max_y) {
     if (f == NULL) perror("couldn't load the file");
 
     char **file_lines = NULL;
     char line_buffer[terminal_max_x];
-    size_t line_counter = 0;
 
     while (read_line(f, terminal_max_x, line_buffer) > 0) {
 	size_t buffer_size = 0;
-	while (line_buffer[buffer_size] != '\n') {
+	while ((line_buffer[buffer_size] != '\n') && buffer_size < terminal_max_x) {
 	    buffer_size++;
 	}
 
-	file_lines = realloc(file_lines, sizeof(char*) * ++line_counter);
-	file_lines[line_counter - 1] = malloc(sizeof(char) * buffer_size + 1);
+	file_lines = realloc(file_lines, sizeof(char*) * ++*file_max_y);
+	file_lines[*file_max_y - 1] = malloc(sizeof(char) * buffer_size + 1);
 
-	strcpy(file_lines[line_counter - 1], line_buffer);
-	file_lines[line_counter - 1][buffer_size] = '\0';
+	strcpy(file_lines[*file_max_y - 1], line_buffer);
+	file_lines[*file_max_y - 1][buffer_size] = '\0';
     }
 
     return file_lines;
 }
 
-void terminal_render_file(char **file_lines, int y_offset) {
+void terminal_render_file(char **file_lines, int y_offset, size_t file_max_y) {
     clear();
-    for (int i = 0; file_lines[y_offset] != NULL; i++) {
-	mvprintw(i, 0, "%s", file_lines[y_offset]);
-	y_offset++;
+    for (int i = 0; y_offset < file_max_y; i++) {
+	mvprintw(i, 0, "%s", file_lines[y_offset++]);
     }
     refresh();
 }
 
-void build_stree(char **file_lines, int terminal_max_x) {
+void build_stree(char **file_lines, int terminal_max_x, size_t file_max_y) {
     int x = 0, y = 0;
 
-    for (int i = 0; file_lines[i] != NULL; i++) {
+    for (int i = 0; i < file_max_y; i++) {
+	char *file_line = file_lines[i];
 	x = strlen(file_lines[i]);
 	strs_include_chunk(&root, file_lines[i], x, y);
 	y++;
@@ -142,13 +140,14 @@ int main(int argc, char *argv[]) {
 
     WINDOW *w = init_ncurses();
     int terminal_max_x = getmaxx(w), terminal_max_y = getmaxy(w);
+    size_t file_max_y = 0;
 
     char *file_name = argv[1], line_buffer[terminal_max_x];
     FILE *f = open_file(file_name);
 
-    char **file_lines = load_file(f, terminal_max_x);
-    terminal_render_file(file_lines, 0);
-    build_stree(file_lines, terminal_max_x);
+    char **file_lines = load_file(f, terminal_max_x, &file_max_y);
+    terminal_render_file(file_lines, 0, file_max_y);
+    build_stree(file_lines, terminal_max_x, file_max_y);
 
     refresh();
     fclose(f);
@@ -163,12 +162,12 @@ int main(int argc, char *argv[]) {
 
 	if (c == KEY_DOWN) {
 	    if (file_lines[y_offset + 1] != NULL) {
-		terminal_render_file(file_lines, ++y_offset);
+		terminal_render_file(file_lines, ++y_offset, file_max_y);
 	    }
 	}
 	if (c == KEY_UP) {
 	    if (y_offset - 1 >= 0) {
-		terminal_render_file(file_lines, --y_offset);
+		terminal_render_file(file_lines, --y_offset, file_max_y);
 	    }
 	}
 
