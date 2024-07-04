@@ -63,6 +63,8 @@ Position** strs_search_positions(STree *root, char *c_arr, size_t c_size, size_t
 	*positions_size = curr_root->positions_size;
 	positions = malloc(sizeof(int) * curr_root->positions_size);
 	positions = curr_root->positions;
+    } else {
+	*positions_size = 0;
     }
 
     return positions;

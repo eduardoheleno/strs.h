@@ -11,6 +11,9 @@
 
 static STree root;
 
+static int terminal_max_x;
+static int terminal_max_y;
+
 WINDOW* init_ncurses() {
     WINDOW *w = initscr();
     noecho();
@@ -22,7 +25,7 @@ WINDOW* init_ncurses() {
     return w;
 }
 
-int read_word(char **word_buffer, char *line_buffer, int terminal_max_x, int *x) {
+int read_word(char **word_buffer, char *line_buffer, int *x) {
     size_t word_buffer_size = 0;
     static size_t cursor = 0;
 
@@ -53,31 +56,35 @@ int read_word(char **word_buffer, char *line_buffer, int terminal_max_x, int *x)
     return 1;
 }
 
-void highlight_characters(Position **positions, char *c_arr, int terminal_max_x, size_t positions_size) {
+void highlight_characters(Position **positions, char *c_arr, size_t positions_size, int y_offset, int file_max_y) {
     if (positions == NULL) return;
 
     attron(COLOR_PAIR(1));
     for (int i = 0; i < positions_size; i++) {
 	Position *p = positions[i];
 
-	mvprintw(p->y, p->x, "%s", c_arr);
-	refresh();
+	if (p->y >= y_offset && p->y < file_max_y - y_offset && p->y - y_offset < terminal_max_y) {
+	    mvprintw(p->y - y_offset, p->x, "%s", c_arr);
+	    refresh();
+	}
     }
     attroff(COLOR_PAIR(1));
 }
 
-void clear_highlight(Position **positions, char *c_arr, int terminal_max_x, size_t positions_size) {
+void clear_highlight(Position **positions, char *c_arr, size_t positions_size, int y_offset, int file_max_y) {
     if (positions == NULL) return;
 
     for (int i = 0; i < positions_size; i++) {
 	Position *p = positions[i];
 
-	mvprintw(p->y, p->x, "%s", c_arr);
-	refresh();
+	if (p->y >= y_offset && p->y < file_max_y - y_offset && p->y - y_offset < terminal_max_y) {
+	    mvprintw(p->y - y_offset, p->x, "%s", c_arr);
+	    refresh();
+	}
     }
 }
 
-void clear_last_char(size_t *c_size, char *c_arr, int terminal_max_y) {
+void clear_last_char(size_t *c_size, char *c_arr) {
     if (c_arr == NULL) return;
 
     if (*c_size == 0) {
@@ -88,10 +95,10 @@ void clear_last_char(size_t *c_size, char *c_arr, int terminal_max_y) {
     }
     c_arr[--*c_size] = '\0';
     c_arr = realloc(c_arr, (sizeof(char) * *c_size) + sizeof(char));
-    mvdelch(terminal_max_y - 1, *c_size + 18);
+    mvdelch(terminal_max_y + 1, *c_size + 18);
 }
 
-char** load_file(FILE *f, int terminal_max_x, size_t *file_max_y) {
+char** load_file(FILE *f, size_t *file_max_y) {
     if (f == NULL) perror("couldn't load the file");
 
     char **file_lines = NULL;
@@ -122,15 +129,24 @@ void free_file(char **file_lines, size_t file_max_y) {
     free(file_lines);
 }
 
+void free_positions(Position **positions, size_t positions_size) {
+    if (positions_size > 0) {
+	for (size_t i = 0; i < positions_size; i++) {
+	    free(positions[i]);
+	}
+    }
+    free(positions);
+}
+
 void terminal_render_file(char **file_lines, int y_offset, size_t file_max_y) {
     clear();
-    for (int i = 0; y_offset < file_max_y; i++) {
+    for (int i = 0; y_offset < file_max_y && i < terminal_max_y; i++) {
 	mvprintw(i, 0, "%s", file_lines[y_offset++]);
     }
     refresh();
 }
 
-void build_stree(char **file_lines, int terminal_max_x, size_t file_max_y) {
+void build_stree(char **file_lines, size_t file_max_y) {
     int x = 0, y = 0;
 
     for (int i = 0; i < file_max_y; i++) {
@@ -148,15 +164,17 @@ int main(int argc, char *argv[]) {
     }
 
     WINDOW *w = init_ncurses();
-    int terminal_max_x = getmaxx(w), terminal_max_y = getmaxy(w);
+    terminal_max_x = getmaxx(w);
+    terminal_max_y = getmaxy(w) - 2;
+
     size_t file_max_y = 0;
 
     char *file_name = argv[1], line_buffer[terminal_max_x];
     FILE *f = open_file(file_name);
 
-    char **file_lines = load_file(f, terminal_max_x, &file_max_y);
+    char **file_lines = load_file(f, &file_max_y);
     terminal_render_file(file_lines, 0, file_max_y);
-    build_stree(file_lines, terminal_max_x, file_max_y);
+    build_stree(file_lines, file_max_y);
 
     refresh();
     fclose(f);
@@ -172,41 +190,56 @@ int main(int argc, char *argv[]) {
 	if (c == KEY_DOWN) {
 	    if (file_lines[y_offset + 1] != NULL) {
 		terminal_render_file(file_lines, ++y_offset, file_max_y);
+		clear_highlight(positions, c_arr, positions_size, y_offset, file_max_y);
+		highlight_characters(positions, c_arr, positions_size, y_offset, file_max_y);
+
+		if (c_size > 0) {
+		    mvprintw(terminal_max_y + 1, 0, "searched pattern: %s", c_arr);
+		    refresh();
+		}
+		continue;
 	    }
 	}
 	if (c == KEY_UP) {
 	    if (y_offset - 1 >= 0) {
 		terminal_render_file(file_lines, --y_offset, file_max_y);
+		clear_highlight(positions, c_arr, positions_size, y_offset, file_max_y);
+		highlight_characters(positions, c_arr, positions_size, y_offset, file_max_y);
+
+		if (c_size > 0) {
+		    mvprintw(terminal_max_y + 1, 0, "searched pattern: %s", c_arr);
+		    refresh();
+		}
+		continue;
 	    }
 	}
 
 	if (c == KEY_BACKSPACE) {
-	    clear_highlight(positions, c_arr, terminal_max_x, positions_size);
+	    clear_highlight(positions, c_arr, positions_size, y_offset, file_max_y);
 
-	    clear_last_char(&c_size, c_arr, terminal_max_y);
+	    clear_last_char(&c_size, c_arr);
 
 	    positions = strs_search_positions(&root, c_arr, c_size, &positions_size);
-	    highlight_characters(positions, c_arr, terminal_max_x, positions_size);
+	    highlight_characters(positions, c_arr, positions_size, y_offset, file_max_y);
 	    continue;
 	}
 	if (c == ESC_KEY) break;
 	if ((c - ASCII_DECIMAL_MN) < 0 || (c - ASCII_DECIMAL_MN) > 93) continue;
 
-	clear_highlight(positions, c_arr, terminal_max_x, positions_size);
+	clear_highlight(positions, c_arr, positions_size, y_offset, file_max_y);
 
 	c_arr = realloc(c_arr, (sizeof(char) * ++c_size) + sizeof(char));
 	c_arr[c_size - 1] = c;
 	c_arr[c_size] = '\0';
 
 	positions = strs_search_positions(&root, c_arr, c_size, &positions_size);
-	highlight_characters(positions, c_arr, terminal_max_x, positions_size);
+	highlight_characters(positions, c_arr, positions_size, y_offset, file_max_y);
 
-	mvprintw(terminal_max_y - 1, 0, "searched pattern: %s", c_arr);
+	mvprintw(terminal_max_y + 1, 0, "searched pattern: %s", c_arr);
 	refresh();
     }
 
-    // free properly
-    free(positions);
+    free_positions(positions, positions_size);
     free_file(file_lines, file_max_y);
     free(c_arr);
     endwin();
