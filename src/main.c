@@ -106,11 +106,20 @@ char** load_file(FILE *f, int terminal_max_x, size_t *file_max_y) {
 	file_lines = realloc(file_lines, sizeof(char*) * ++*file_max_y);
 	file_lines[*file_max_y - 1] = malloc(sizeof(char) * buffer_size + 1);
 
-	strcpy(file_lines[*file_max_y - 1], line_buffer);
+	for (int i = 0; i < buffer_size; i++) {
+	    file_lines[*file_max_y - 1][i] = line_buffer[i];
+	}
 	file_lines[*file_max_y - 1][buffer_size] = '\0';
     }
 
     return file_lines;
+}
+
+void free_file(char **file_lines, size_t file_max_y) {
+    for (size_t i = 0; i < file_max_y; i++) {
+	free(file_lines[i]);
+    }
+    free(file_lines);
 }
 
 void terminal_render_file(char **file_lines, int y_offset, size_t file_max_y) {
@@ -198,6 +207,7 @@ int main(int argc, char *argv[]) {
 
     // free properly
     free(positions);
+    free_file(file_lines, file_max_y);
     free(c_arr);
     endwin();
 
