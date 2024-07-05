@@ -21,6 +21,7 @@ WINDOW* init_ncurses() {
 
     start_color();
     init_pair(1, COLOR_BLACK, COLOR_RED);
+    init_pair(2, COLOR_BLACK, COLOR_WHITE);
 
     return w;
 }
@@ -56,19 +57,25 @@ int read_word(char **word_buffer, char *line_buffer, int *x) {
     return 1;
 }
 
-void highlight_characters(Position **positions, char *c_arr, size_t positions_size, int y_offset, int file_max_y) {
+void highlight_characters(Position **positions, char *c_arr, size_t positions_size, int y_offset, int file_max_y,
+    size_t position_index) {
     if (positions == NULL) return;
 
-    attron(COLOR_PAIR(1));
     for (int i = 0; i < positions_size; i++) {
 	Position *p = positions[i];
 
-	if (p->y >= y_offset && p->y < file_max_y - y_offset && p->y - y_offset < terminal_max_y) {
+	if (p->y >= y_offset && p->y - y_offset < terminal_max_y && i == position_index - 1) {
+	    attron(COLOR_PAIR(2));
 	    mvprintw(p->y - y_offset, p->x, "%s", c_arr);
 	    refresh();
+	    attroff(COLOR_PAIR(2));
+	} else if (p->y >= y_offset && p->y - y_offset < terminal_max_y) {
+	    attron(COLOR_PAIR(1));
+	    mvprintw(p->y - y_offset, p->x, "%s", c_arr);
+	    refresh();
+	    attroff(COLOR_PAIR(1));
 	}
     }
-    attroff(COLOR_PAIR(1));
 }
 
 void clear_highlight(Position **positions, char *c_arr, size_t positions_size, int y_offset, int file_max_y) {
@@ -77,7 +84,7 @@ void clear_highlight(Position **positions, char *c_arr, size_t positions_size, i
     for (int i = 0; i < positions_size; i++) {
 	Position *p = positions[i];
 
-	if (p->y >= y_offset && p->y < file_max_y - y_offset && p->y - y_offset < terminal_max_y) {
+	if (p->y >= y_offset && p->y - y_offset < terminal_max_y) {
 	    mvprintw(p->y - y_offset, p->x, "%s", c_arr);
 	    refresh();
 	}
@@ -180,21 +187,21 @@ int main(int argc, char *argv[]) {
     fclose(f);
 
     Position **positions = NULL;
-    size_t c_size = 0, positions_size = 0;
+    size_t c_size = 0, positions_size = 0, position_index = 0;
     char *c_arr;
     int y_offset = 0;
 
     for (;;) {
 	int c = getch();
-
 	if (c == KEY_DOWN) {
 	    if (file_lines[y_offset + 1] != NULL) {
 		terminal_render_file(file_lines, ++y_offset, file_max_y);
 		clear_highlight(positions, c_arr, positions_size, y_offset, file_max_y);
-		highlight_characters(positions, c_arr, positions_size, y_offset, file_max_y);
+		highlight_characters(positions, c_arr, positions_size, y_offset, file_max_y, position_index);
 
 		if (c_size > 0) {
 		    mvprintw(terminal_max_y + 1, 0, "searched pattern: %s", c_arr);
+		    mvprintw(terminal_max_y, 0, "[%zu/%zu]", position_index, positions_size);
 		    refresh();
 		}
 		continue;
@@ -204,23 +211,55 @@ int main(int argc, char *argv[]) {
 	    if (y_offset - 1 >= 0) {
 		terminal_render_file(file_lines, --y_offset, file_max_y);
 		clear_highlight(positions, c_arr, positions_size, y_offset, file_max_y);
-		highlight_characters(positions, c_arr, positions_size, y_offset, file_max_y);
+		highlight_characters(positions, c_arr, positions_size, y_offset, file_max_y, position_index);
 
 		if (c_size > 0) {
 		    mvprintw(terminal_max_y + 1, 0, "searched pattern: %s", c_arr);
+		    mvprintw(terminal_max_y, 0, "[%zu/%zu]", position_index, positions_size);
 		    refresh();
 		}
 		continue;
 	    }
 	}
-
 	if (c == KEY_BACKSPACE) {
 	    clear_highlight(positions, c_arr, positions_size, y_offset, file_max_y);
 
 	    clear_last_char(&c_size, c_arr);
 
 	    positions = strs_search_positions(&root, c_arr, c_size, &positions_size);
-	    highlight_characters(positions, c_arr, positions_size, y_offset, file_max_y);
+	    highlight_characters(positions, c_arr, positions_size, y_offset, file_max_y, position_index);
+	    continue;
+	}
+	if (c == KEY_RIGHT) {
+	    if (positions_size > 0 && position_index < positions_size) {
+		int next_position_y = positions[position_index++]->y;
+
+		if (next_position_y > y_offset + terminal_max_y - 1 || next_position_y < y_offset) {
+		    y_offset = next_position_y;
+		}
+		terminal_render_file(file_lines, y_offset, file_max_y);
+		highlight_characters(positions, c_arr, positions_size, y_offset, file_max_y, position_index);
+
+		mvprintw(terminal_max_y + 1, 0, "searched pattern: %s", c_arr);
+		mvprintw(terminal_max_y, 0, "[%zu/%zu]", position_index, positions_size);
+		refresh();
+	    }
+	    continue;
+	}
+	if (c == KEY_LEFT) {
+	    if (positions_size > 0 && position_index - 1 > 0 && position_index <= positions_size) {
+		int prev_position_y = positions[--position_index - 1]->y;
+
+		if (prev_position_y < y_offset || prev_position_y > y_offset + terminal_max_y) {
+		    y_offset = prev_position_y;
+		}
+		terminal_render_file(file_lines, y_offset, file_max_y);
+		highlight_characters(positions, c_arr, positions_size, y_offset, file_max_y, position_index);
+
+		mvprintw(terminal_max_y + 1, 0, "searched pattern: %s", c_arr);
+		mvprintw(terminal_max_y, 0, "[%zu/%zu]", position_index, positions_size);
+		refresh();
+	    }
 	    continue;
 	}
 	if (c == ESC_KEY) break;
@@ -233,9 +272,12 @@ int main(int argc, char *argv[]) {
 	c_arr[c_size] = '\0';
 
 	positions = strs_search_positions(&root, c_arr, c_size, &positions_size);
-	highlight_characters(positions, c_arr, positions_size, y_offset, file_max_y);
+	highlight_characters(positions, c_arr, positions_size, y_offset, file_max_y, position_index);
+
+	position_index = 0;
 
 	mvprintw(terminal_max_y + 1, 0, "searched pattern: %s", c_arr);
+	mvprintw(terminal_max_y, 0, "[%zu/%zu]", position_index, positions_size);
 	refresh();
     }
 
